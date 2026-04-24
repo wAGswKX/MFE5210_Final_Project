@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>交易系统日志监控</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f0f2f5; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h2 { color: #1a1a1a; border-left: 5px solid #007bff; padding-left: 15px; }
+
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background-color: #f8f9fa; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* 级别颜色区分 */
+        .level-info { color: #28a745; font-weight: bold; }
+        .level-error { color: #dc3545; font-weight: bold; }
+        .level-warn { color: #ffc107; font-weight: bold; }
+
+        .ts-cell { color: #888; font-family: monospace; }
+        .extra-cell { font-size: 12px; color: #666; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>交易系统实时日志</h2>
+
+    <div class="controls">
+        <button onclick="fetchLogs()">🔄 刷新数据</button>
+        <span id="status" style="margin-left: 10px; line-height: 40px; color: #666;"></span>
+    </div>
+
+    <table id="logTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>时间 (UTC)</th>
+                <th>级别</th>
+                <th>模块</th>
+                <th>消息内容</th>
+                <th>详情 (JSON)</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:8000/logs";
+
+    async function fetchLogs() {
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = "正在同步中...";
+
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error('网络响应异常');
+
+            const logs = await response.json();
+            const tbody = document.querySelector("#logTable tbody");
+            tbody.innerHTML = "";
+
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+
+                // 根据级别设置颜色
+                const levelClass = `level-${log.level.toLowerCase()}`;
+
+                row.innerHTML = `
+                    <td>${log.id}</td>
+                    <td class="ts-cell">${log.ts}</td>
+                    <td class="${levelClass}">${log.level}</td>
+                    <td><strong>${log.module}</strong></td>
+                    <td>${log.message}</td>
+                    <td class="extra-cell" title='${log.extra_json || ""}'>${log.extra_json || "-"}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            statusEl.innerText = `最后更新: ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+            console.error("Fetch Error:", err);
+            statusEl.innerText = "获取失败，请检查后端是否运行或是否存在跨域限制";
+            statusEl.style.color = "red";
+        }
+    }
+
+    // 初始加载
+    fetchLogs();
+
+    // 每30秒自动刷新一次
+    setInterval(fetchLogs, 30000);
+</script>
+
+</body>
+</html>
