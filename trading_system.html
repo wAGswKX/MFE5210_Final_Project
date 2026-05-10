@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>交易管理终端</title>
+    <style>
+        body { font-family: 'PingFang SC', sans-serif; background: #f5f7f9; margin: 0; padding: 20px; }
+        .dashboard { max-width: 1200px; margin: auto; }
+
+        /* 顶部导航 */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; background: #fff; font-weight: bold; color: #666; transition: 0.3s; }
+        .tab-btn.active { background: #007bff; color: #fff; }
+
+        /* 内容区域 */
+        .content-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .data-table th { background: #fafafa; color: #888; font-size: 13px; }
+
+        /* 净值卡片特有样式 */
+        .equity-info { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('equity')">账户净值</button>
+        <button class="tab-btn" onclick="switchTab('positions')">当前持仓</button>
+        <button class="tab-btn" onclick="switchTab('orders')">历史订单</button>
+    </div>
+
+    <div id="mainContent" class="content-card">
+        正在加载数据...
+    </div>
+</div>
+
+<script>
+    const BASE_URL = "http://127.0.0.1:8000";
+
+    async function fetchData(endpoint) {
+        try {
+            const response = await fetch(`${BASE_URL}/${endpoint}`);
+            return await response.json();
+        } catch (error) {
+            console.error(`读取 ${endpoint} 失败:`, error);
+            return null;
+        }
+    }
+
+    async function switchTab(type) {
+        // 更新按钮状态
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.innerText.includes(type === 'equity' ? '净值' : (type === 'positions' ? '持仓' : '订单')));
+        });
+
+        const container = document.getElementById('mainContent');
+        container.innerHTML = "正在同步交易所数据...";
+
+        const data = await fetchData(type);
+        if (!data) {
+            container.innerHTML = `<b style="color:red">无法连接到后端 /${type} 接口</b>`;
+            return;
+        }
+
+        if (type === 'equity') {
+            // 假设返回 { "total_equity": 100000, "balance": 95000, "currency": "USD" }
+            container.innerHTML = `
+                <h3>账户概览</h3>
+                <div class="equity-info">$ ${data.total_equity || data.equity || '0.00'}</div>
+                <p>可用余额: ${data.balance || '-'}</p>
+                <p>更新时间: ${new Date().toLocaleString()}</p>
+            `;
+        }
+        else if (type === 'positions') {
+            // 假设返回数组 [{ "symbol": "BTC", "qty": 1.5, "price": 65000 }]
+            let html = `<h3>持仓详情</h3><table class="data-table"><thead><tr><th>标的</th><th>数量</th><th>开仓价</th></tr></thead><tbody>`;
+            data.forEach(item => {
+                html += `<tr><td><b>${item.symbol}</b></td><td>${item.qty}</td><td>${item.price || item.entry_price}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+        else if (type === 'orders') {
+            // 假设返回数组 [{ "order_id": "123", "symbol": "ETH", "side": "BUY", "status": "FILLED" }]
+            let html = `<h3>订单记录</h3><table class="data-table"><thead><tr><th>订单ID</th><th>标的</th><th>方向</th><th>状态</th></tr></thead><tbody>`;
+            data.forEach(item => {
+                html += `<tr><td>${item.order_id || item.id}</td><td>${item.symbol}</td><td>${item.side}</td><td>${item.status}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+    }
+
+    // 默认加载净值
+    switchTab('equity');
+</script>
+
+</body>
+</html>
